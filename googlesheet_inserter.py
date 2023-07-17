@@ -2,16 +2,24 @@ import pygsheets
 from typing import Dict, List, Union, Any
 
 class GoogleSheetInserter:
+    """Класс для добавления записей в Google Sheet."""
+    
     def __init__(
-        self, credence_service_file: str = "", googlesheet_file_url: str = ""
+        self, credence_service_file:str = "", googlesheet_file_url:str = ""
     ) -> None:
+        """Инициализирует класс.
+        Args:
+            credence_service_file (str): Путь до сервисного файла credence.json (Google Sheet API).
+            googlesheet_file_url (str): Ссылка на Google Sheet.
+        Returns:
+        """
         self.credence_service_file = credence_service_file
         self.googlesheet_file_url = googlesheet_file_url
 
     def _get_googlesheet_by_url(
         self, googlesheet_client: pygsheets.client.Client
     ) -> pygsheets.Spreadsheet:
-        """Get Google.Docs Table sheet by document url"""
+        """Получает Google.Docs таблицу по ссылке на документ."""
         sheets: pygsheets.Spreadsheet = googlesheet_client.open_by_url(
             self.googlesheet_file_url
         )
@@ -24,12 +32,13 @@ class GoogleSheetInserter:
         start_col: str,
         end_col: str,
     ) -> bool:
-        """Finds the number of the last filled line and inserts the data after it
-        :param sheet: - Google.Docs Spreadsheet object.
-        :param data: - dictionary with data intended for insertion.
-        :param start_col: - the column of the table from which the insertion begins.
-        :param end_col: - the column of the table with which the insert ends.
-        :return: - True in case of successful insertion and False otherwise
+        """Находит номер последней заполненной строки и вставляет данные после нее.
+        Args:
+            sheet (pygsheets.Spreadsheet): - Объект электронной таблицы Google.Docs.
+            data (List[List[Union[str, bool]]]): - Cловарь с данными, предназначенными для вставки.
+            start_col (str): - столбец таблицы, с которого начинается вставка.
+            end_col (str): - столбец таблицы, на котором заканчивается вставка.
+        Returns: - True в случае успешной вставки и False в противном случае.
         """
         last_filled_row: List[str] = len(
             list(filter(lambda cell: cell != "", sheet.get_col(1)))
@@ -43,8 +52,8 @@ class GoogleSheetInserter:
         else:
             return True
 
-    def _get_googlesheet_client(self):
-        """It is authorized using the service key and returns the Google Docs client object"""
+    def _get_googlesheet_client(self) ->  pygsheets.client.Client:
+        """Он авторизуется с помощью служебного ключа и возвращает объект клиента Google Docs."""
         return pygsheets.authorize(
             service_file=self.credence_service_file
         )
@@ -55,11 +64,12 @@ class GoogleSheetInserter:
         start_col: str = "A",
         end_col: str = "E",
     ) -> bool:
-        """Inserts a row of data into a Google table
-        :param data: - dictionary with data intended for insertion.
-        :param start_col: - the column of the table from which the insertion begins.
-        :param end_col: - the column of the table with which the insert ends.
-        :return: - True in case of successful insertion and False otherwise
+        """Вставляет строку данных в таблицу Google.
+        Args:
+            data (List[List[Union[str, bool]]]):  Cловарь с данными, предназначенными для вставки.
+            start_col (str): Cтолбец таблицы, с которого начинается вставка.
+            end_col (str): Cтолбец таблицы, с которого заканчивается вставка.
+        Returns: True в случае успешной вставки и False в противном случае.
         """
         googlesheet_client: pygsheets.client.Client = self._get_googlesheet_client()
         wks: pygsheets.Spreadsheet = self._get_googlesheet_by_url(googlesheet_client)
@@ -74,11 +84,12 @@ class GoogleSheetInserter:
         user_poll_data: Dict[str, Union[str, bool, Any]],
         current_date: str,
     ) -> bool:
-        """Writes data to a Google Spreadsheet
-        :param primary_col: - the value identifying the data string.
-        :param user_poll_dataЖ: - data for recording.
-        :param current_date: - recording date. 
-        :return:
+        """Записывает данные в электронную таблицу Google.
+        Args:
+            primary_col (str): Значение, идентифицирующее строку данных.
+            user_poll_data (Dict[str, Union[str, bool, Any]]): Данные для записи.
+            current_date (str): Дата записи. 
+        Returns:
         """
         print("Результаты опроса в обработчике date_handler: ", user_poll_data)
         print("ФИО пользователя, прошедшего опрос:", primary_col)
@@ -96,3 +107,4 @@ class GoogleSheetInserter:
             start_col="A",
             end_col="F",
         )
+        
