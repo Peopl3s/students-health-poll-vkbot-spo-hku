@@ -10,8 +10,6 @@ from vkwave.api.methods._error import APIError
 from loguru import logger
 from googlesheet_inserter import GoogleSheetInserter
 
-#572305885
-
 logger.add(
     config.settings["LOG_FILE"],
     format="{time} {level} {message}",
@@ -22,7 +20,14 @@ logger.add(
 
 
 class HealthPollBot(SimpleLongPollBot):
+    """Класс для опроса состояния здоровья студентов ВК.
+    Attr: 
+        current_date (str): Дата опроса.
+    """
+    
     class PollStage(Enum):
+        """Стадии опроса."""
+        
         WILL_CERTIFICATE = auto()
         CERTIFICATE_DATA = auto()
         SYMPTOMS = auto()
@@ -30,7 +35,8 @@ class HealthPollBot(SimpleLongPollBot):
         DONE = auto()
         IN_PROGRESS = auto()
         IS_ILL = auto()
-
+        
+    # Словарь с вопросами, где стадии соответствует вопрос
     question: Dict[PollStage, Union[str, List[Any]]] = {
         PollStage.WILL_CERTIFICATE: [
             "Будет ли справка",
@@ -45,13 +51,23 @@ class HealthPollBot(SimpleLongPollBot):
 
     def __init__(
         self,
-        tokens,
-        group_id,
+        tokens:str,
+        group_id:str|int,
         router: Optional[BaseRouter] = None,
         uvloop: bool = False,
         respondents: Dict[str, Dict] = None,
-        inserter=None,
-    ):
+        inserter:GoogleSheetInserter = None,
+    ) -> None:
+        """Инициализирует класс.
+        Args:
+            tokens (str): Токен бота для доступа к Telegram API.
+            group_id (str|int): id публичной страницы ВКонтакте от имени которой опрос.
+            router (Optional[BaseRouter]): Роутер для маршрутизации бота.
+            uvloop (bool): Внешний эвентлуп.
+            respondents (Dict[str, Dict]): Список id участников опроса.
+            inserter (GoogleSheetInserter): Агрегат для вставки данных в Google Sheet.
+        Returns:
+        """
         super().__init__(tokens, group_id=group_id, router=router, uvloop=uvloop)
         self.current_date: str = ""
         self.respondents = respondents if respondents else dict()
@@ -59,18 +75,22 @@ class HealthPollBot(SimpleLongPollBot):
 
     @property
     def poll_googlesheet_credence_service_file(self) -> str:
+        """Возвращает сервисный файл Google API."""
         return self._inserter.credence_service_file
     
     @poll_googlesheet_credence_service_file.setter
     def poll_googlesheet_credence_service_file(self, credence_service_file: str) -> None:
+        """Устанавливает сервисный файл Google API."""
         self._inserter.credence_service_file = credence_service_file
 
     @property
     def pollresult_googlesheet_file_url(self) -> str:
+        """Возвращает ссылку на Google документ."""
         return self._inserter.googlesheet_file_url
     
     @pollresult_googlesheet_file_url.setter
     def pollresult_googlesheet_file_url(self, googlesheet_file_url: str) -> None:
+        """Устанавливает ссылку на Google документ."""
         self._inserter.googlesheet_file_url = googlesheet_file_url
 
 
@@ -79,13 +99,13 @@ bot: HealthPollBot = HealthPollBot(
     group_id=config.settings["VK_GROUP_ID"],
     inserter=GoogleSheetInserter(),
 )
-
-bot.poll_googlesheet_credence_service_file = "creds.json"
-#bot.pollresult_googlesheet_file_url = "https://docs.google.com/spreadsheets/d/1rE4yFzZe0SE4PWrOgQFDjHv33yN6a1_oIR4KEZeIkpI"
+bot.poll_googlesheet_credence_service_file = config.settings["CREDS_FILE"]
 
 
 @bot.message_handler(bot.regex_filter(r"(\d{1,2}(\.|\\|\/)\d{1,2}(\.|\\|\/)\d{2,4})"))
 async def date_handler(event: SimpleBotEvent) -> None:
+    """Обрабатывает вопрос про дату последнего посещения занятий."""
+    
     user_id: str = str(event.object.object.message.from_id)
     text_msg: str = event.object.object.message.text.strip()
     print("Сообщение пользователя из обработчика date_handler: ", text_msg)
@@ -148,6 +168,8 @@ async def date_handler(event: SimpleBotEvent) -> None:
 
 @bot.message_handler(bot.payload_contains_filter("will_certificate"))
 async def is_certificate_handler(event: SimpleBotEvent):
+    """Обрабатывает вопрос про справку о болезне."""
+    
     user_id: str = str(event.object.object.message.from_id)
     text_msg: str = event.object.object.message.text.strip()
     bot_msg: str = ""
@@ -184,6 +206,8 @@ async def is_certificate_handler(event: SimpleBotEvent):
 
 @bot.message_handler(bot.payload_contains_filter("yes_no"))
 async def is_ill_handler(event: SimpleBotEvent):
+    """Обрабатывает вопрос болен ли пользователь."""
+    
     user_id: str = str(event.object.object.message.from_id)
     print('Payload', event.object.object.message.payload)
     text_msg: str = event.object.object.message.text.strip()
@@ -224,11 +248,10 @@ async def is_ill_handler(event: SimpleBotEvent):
 
 @bot.message_handler(bot.regex_filter(r"((!|\/)start (.*?) (https://docs.google.com/(.*?)))"))
 async def start_handler(event: SimpleBotEvent) -> None:
+    """Организует начало опроса."""
+    
     text_msg: str = event.object.object.message.text.strip()
     path_to_file_with_respondents_ids, bot.pollresult_googlesheet_file_url = text_msg.split(' ')[1:]
-    print(path_to_file_with_respondents_ids, bot.pollresult_googlesheet_file_url)
-    #path_to_file_with_respondents_ids: str = "iss-11.txt"
-    #bot.pollresult_googlesheet_file_url = "https://docs.google.com/spreadsheets/d/1rE4yFzZe0SE4PWrOgQFDjHv33yN6a1_oIR4KEZeIkpI"
     bot.current_date = datetime.today().strftime("%Y-%m-%d")
     try:
         file_with_poll_user_ids: Optional[List[str]] = pollutils.read_lines_from_file(
@@ -273,6 +296,8 @@ async def start_handler(event: SimpleBotEvent) -> None:
 
 @bot.message_handler(bot.regex_filter(r"(^[^!\/](@|#)?[\d\w\s\W]+)|(^(?!\d{1,2}(\.|\\|\/)\d{1,2}(\.|\\|\/)\d{2,4})*$)"))
 async def symptoms_handler(event: SimpleBotEvent) -> None:
+    """Обрабатывает вопрос про симптомы заболевания."""
+    
     user_id: str = str(event.object.object.message.from_id)
     text_msg: str = event.object.object.message.text.strip(" @#")
     print("Сообщение пользователя из обработчика symptoms_handler: ", text_msg)
@@ -293,6 +318,5 @@ async def symptoms_handler(event: SimpleBotEvent) -> None:
                 logger.debug(f"{send_error.message}: Trouble id: {user_id}")
                 return
         else:
-            pass
-        
+            pass       
 bot.run_forever()
